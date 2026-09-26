@@ -33,3 +33,6 @@ Thumbs.db
 # private project docs (not part of the app)
 *.docx
 research/
+
+.vercel
+.env*

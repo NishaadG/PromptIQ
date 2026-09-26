@@ -1,0 +1,5 @@
+research/
+*.docx
+node_modules/
+.next/
+.env*
