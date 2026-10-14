@@ -4,11 +4,16 @@ import { requireUser } from "@/lib/server/dal";
 import { listUserAttempts } from "@/lib/server/services/attempts";
 import { dashboardStats, listTasksForUser } from "@/lib/server/services/catalog";
 import { progressOf } from "@/lib/server/services/present";
+import { listCredentials, trackProgress } from "@/lib/server/services/certification";
+import { Certificates } from "@/components/Certificates";
 
 export default async function Profile() {
   const user = await requireUser();
   const db = await getDb();
-  const [stats, history, tasks] = await Promise.all([dashboardStats(db, user.id), listUserAttempts(db, user.id, 15), listTasksForUser(db, user.id)]);
+  const [stats, history, tasks, tracks, held] = await Promise.all([
+    dashboardStats(db, user.id), listUserAttempts(db, user.id, 15), listTasksForUser(db, user.id),
+    trackProgress(db, user.id), listCredentials(db, user.id),
+  ]);
   const p = progressOf(user);
   return (
     <div className="rise">
@@ -33,7 +38,8 @@ export default async function Profile() {
           ))}
         </dl>
         <div>
-          <p className="eyebrow">History</p>
+          <Certificates tracks={tracks} held={held.map((c) => ({ id: c.id, track: c.track, level: c.level, score: c.score, expiresAt: c.expiresAt.toISOString(), revoked: c.revoked }))} />
+          <p className="eyebrow mt-12">History</p>
           <ul className="mt-2">
             {history.length === 0 && <li className="border-b border-line py-3 text-[0.92rem] text-ink-2">No attempts yet.</li>}
             {history.map((a) => (
