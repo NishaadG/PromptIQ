@@ -8,7 +8,7 @@ import { listTasksForUser } from "@/lib/server/services/catalog";
 import { signUp } from "@/lib/server/services/accounts";
 import { runAttempt } from "@/lib/server/services/attempts";
 import { scoreAttempt } from "@/lib/scoring";
-import { simulatedProvider } from "@/lib/server/llm";
+import { simulatedProvider, simulateResponse } from "@/lib/server/llm";
 
 let db: DB;
 let close: () => Promise<void>;
@@ -58,5 +58,13 @@ describe("admin", () => {
     const stats = (await itemStats(db)).find((s) => s.task.id === "legal-clause-01")!;
     expect(stats.attempts).toBe(10);
     if (r.ok) expect(r.task.medianScore).toBe(stats.observedMedianScore);
+  });
+});
+
+describe("item bank: sample prompts are good prompts", () => {
+  it.each(SEED_TASKS.map((t) => [t.id, t] as const))("%s sample prompt scores ≥85 on the simulated model", (_id, t) => {
+    const response = simulateResponse(t as unknown as Task, t.samplePrompt);
+    const s = scoreAttempt({ task: t as unknown as Task, prompt: t.samplePrompt, response, promptTokens: 100, outputTokens: 50 });
+    expect(s.taskSuccess).toBeGreaterThanOrEqual(85);
   });
 });
