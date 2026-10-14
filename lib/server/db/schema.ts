@@ -129,6 +129,27 @@ export const credentials = pgTable(
   (t) => [index("credentials_user_idx").on(t.userId)],
 );
 
+/* ------------------------------------------------------------------ Local Lab */
+
+export type LabSide = {
+  provider: string; model: string; label: string; response: string; taskSuccess: number;
+  totalTokens: number; latencyMs: number; costUsd: number;
+};
+
+export const labRuns = pgTable(
+  "lab_runs",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    taskId: text("task_id").notNull().references(() => tasks.id),
+    prompt: text("prompt").notNull(),
+    cloud: jsonb("cloud").$type<LabSide>().notNull(),
+    local: jsonb("local").$type<LabSide>().notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("lab_runs_user_idx").on(t.userId, t.createdAt)],
+);
+
 export type User = typeof users.$inferSelect;
 export type Task = typeof tasks.$inferSelect;
 export type Attempt = typeof attempts.$inferSelect;

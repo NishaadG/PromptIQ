@@ -85,3 +85,20 @@ describe("attempt → score → claim", () => {
     expect(week.some((r) => r.isYou)).toBe(true);
   });
 });
+
+describe("local lab", () => {
+  it("runs both models, scores them, and aggregates history", async () => {
+    const { runLab, labHistory } = await import("@/lib/server/services/lab");
+    const { simulatedSmallProvider } = await import("@/lib/server/llm");
+    const u = await signUp(db, { email: "lab@example.com", password: "password123" });
+    const providers = { cloud: simulatedProvider, local: simulatedSmallProvider };
+    const vague = await runLab(db, u, "plan-math-07", "Which plan is cheaper over a year?", providers);
+    expect(vague.run.local.costUsd).toBe(0);
+    expect(vague.run.cloud.costUsd).toBeGreaterThan(0);
+    expect(vague.run.local.taskSuccess).toBeLessThan(vague.run.cloud.taskSuccess); // small model slips on arithmetic
+    const careful = await runLab(db, u, "plan-math-07", SEED_TASKS[6].samplePrompt.replace("Show the arithmetic briefly", "Think step by step and show the arithmetic"), providers);
+    expect(careful.verdict.kind).toBe("matched"); // explicit reasoning closes the gap
+    const h = await labHistory(db, u.id);
+    expect(h[0]).toMatchObject({ category: "Reasoning", runs: 2 });
+  });
+});

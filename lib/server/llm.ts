@@ -117,12 +117,49 @@ export function getProvider(kind = process.env.LLM_PROVIDER ?? "simulated"): Llm
   return simulatedProvider;
 }
 
+/**
+ * Offline stand-in for a ~3B local model. Its failure modes follow our study's findings for
+ * small models: arithmetic slips unless asked to reason step by step, dropped points unless the
+ * asks are enumerated, and padding unless length is constrained.
+ */
+export function simulateSmallModelResponse(task: Task, prompt: string): string {
+  const ts = detectTechniques(prompt);
+  let text = simulateResponse(task, prompt);
+  if (["reasoning", "explanation"].includes(task.domain) && !has(ts, "chain_of_thought") && !has(ts, "numbered_asks")) {
+    // One arithmetic slip in the last computed figure (e.g. "1,068" -> "1,078").
+    const nums = [...text.matchAll(/\d{1,3}(?:,\d{3})+|\d{3,}/g)];
+    const last = nums[nums.length - 1];
+    if (last?.index !== undefined) {
+      const wrong = (Number(last[0].replace(/,/g, "")) + 10).toLocaleString("en-US");
+      text = text.slice(0, last.index) + wrong + text.slice(last.index + last[0].length);
+    }
+  }
+  if (["summarization", "rewriting", "explanation"].includes(task.domain) && !has(ts, "numbered_asks")) {
+    const parts = text.split(/\n\s*\n/);
+    if (parts.length > 2) text = parts.slice(0, -1).join("\n\n"); // drops the last point
+  }
+  return text;
+}
+
+export const simulatedSmallProvider: LlmProvider = {
+  name: "simulated-local",
+  async complete({ system, user, task, learnerPrompt }) {
+    const t0 = Date.now();
+    const text = task ? simulateSmallModelResponse(task, `${system ?? ""}\n${learnerPrompt ?? user}`) : "Simulated response.";
+    return {
+      text, model: "promptiq-sim-3b", provider: "simulated-local",
+      inputTokens: countTokens(`${system ?? ""}${user}`), outputTokens: countTokens(text),
+      latencyMs: Date.now() - t0 + 900 + (text.length % 900), // small models on laptops are slower per token
+    };
+  },
+};
+
 /** Second provider for Local Lab comparisons (e.g. a small local Ollama model). */
 export function getLocalProvider(): LlmProvider {
   if (process.env.LOCAL_LLM_BASE_URL && process.env.LOCAL_LLM_MODEL) {
     return openAiCompatible({ baseUrl: process.env.LOCAL_LLM_BASE_URL, model: process.env.LOCAL_LLM_MODEL, name: "local" });
   }
-  return simulatedProvider;
+  return simulatedSmallProvider;
 }
 
 /** Build the message the model sees: {{context}} in the prompt is replaced by the source text; otherwise it is appended. */
