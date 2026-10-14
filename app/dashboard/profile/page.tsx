@@ -7,6 +7,7 @@ import { progressOf } from "@/lib/server/services/present";
 import { listCredentials, trackProgress } from "@/lib/server/services/certification";
 import { Certificates } from "@/components/Certificates";
 import { ProfileForm } from "@/components/ProfileForm";
+import { AccountSettings } from "@/components/AccountSettings";
 
 export default async function Profile() {
   const user = await requireUser();
@@ -40,6 +41,7 @@ export default async function Profile() {
           ))}
         </dl>
         <ProfileForm name={user.name} org={user.org} />
+        <AccountSettings isDemo={user.isDemo} />
         </div>
         <div>
           <Certificates tracks={tracks} held={held.map((c) => ({ id: c.id, track: c.track, level: c.level, score: c.score, expiresAt: c.expiresAt.toISOString(), revoked: c.revoked }))} />

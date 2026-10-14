@@ -104,9 +104,11 @@ All JSON. Authenticated routes use the session cookie set by login/sign-up.
 |---|---|---|
 | `POST /api/auth/signup` · `POST /api/auth/login` · `POST /api/auth/logout` | – | Session management |
 | `GET/PATCH /api/me` · `GET /api/me/dashboard` | ✓ | Current user (update name/organisation); dashboard payload |
+| `POST /api/me/password` `{currentPassword, newPassword}` | ✓ | Change password; signs out all other sessions |
+| `GET /api/me/export` · `DELETE /api/me` `{password}` | ✓ | Download all your data as JSON / permanently delete your account |
 | `GET /api/team` | ✓ | Your organisation's members and readiness summary |
 | `GET /api/tasks` · `GET /api/tasks/:id` | ✓ | Item bank (rubric internals are never exposed) |
-| `POST /api/tasks/:id/attempts` `{prompt}` | ✓ | Run + score a prompt (creates an unclaimed attempt) |
+| `POST /api/tasks/:id/attempts` `{prompt, elapsedMs?, pastedChars?}` | ✓ | Run + score a prompt (creates an unclaimed attempt) |
 | `POST /api/attempts/:id/claim` | ✓ | Claim the reward (pays only improvements on your best) |
 | `GET /api/leaderboard?period=week\|all` | – | Standings |
 | `GET/POST /api/local-lab/runs` `{taskId, prompt}` | ✓ | Lab history / run a side-by-side comparison |

@@ -43,3 +43,8 @@ export async function deleteSession(db: DB, token: string | undefined) {
 export async function purgeExpiredSessions(db: DB) {
   await db.delete(sessions).where(lt(sessions.expiresAt, new Date()));
 }
+
+/** Sign out everywhere (used after a password change). */
+export async function deleteUserSessions(db: DB, userId: string) {
+  await db.delete(sessions).where(eq(sessions.userId, userId));
+}
