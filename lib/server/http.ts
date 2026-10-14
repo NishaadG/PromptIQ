@@ -57,3 +57,10 @@ export function rateLimit(key: string, limit: number, windowMs: number) {
 export function clientKey(req: Request) {
   return req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || "local";
 }
+
+export async function requireApiAdmin(): Promise<User> {
+  const user = await requireApiUser();
+  const { isAdmin } = await import("./services/admin");
+  if (!isAdmin(user)) throw new HttpError(403, "Admins only");
+  return user;
+}

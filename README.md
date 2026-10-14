@@ -31,6 +31,7 @@ once a track is passed → open its public verification link.
 | Progression | Rewards with an anti-farming rule (you earn your *best* result per task once), XP and levels, daily streaks, an Elo-style skill rating, adaptive task recommendation |
 | Leaderboards | All-time (balance) and this week (tokens earned in the last 7 days) |
 | Local Lab | Same prompt on a cloud model and a small local model, scored side by side with cost and latency; history by task type |
+| Item bank admin | Admins author/edit tasks with a validated rubric schema, retire tasks, see per-item statistics from real learners (attempts, mean, pass rate, observed medians) and recalibrate benchmarks from data. Grant admin with `npm run db:admin -- you@example.com` or `ADMIN_EMAILS` |
 | Certificates | Ed25519-signed credentials per track (all tasks passed at 85+), 24-month expiry, public `/verify/<id>` page, machine verification API and published public key; tamper detection |
 
 ## Configuration (`.env.local`)
@@ -45,6 +46,7 @@ All optional — see `.env.example`.
 | `LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY` | — | Endpoint for `openai` mode (see below) |
 | `LOCAL_LLM_BASE_URL`, `LOCAL_LLM_MODEL` | *(unset → simulated 3B model)* | The "local" side of Local Lab, e.g. Ollama |
 | `CLOUD_USD_PER_MTOK` | `5` | Reference price used to cost the cloud side in Local Lab |
+| `ADMIN_EMAILS` | – | Comma-separated emails treated as admins |
 | `PROMPTIQ_SIGNING_KEY` | *(dev: auto-generated `.data/signing-key.pem`)* | Ed25519 PKCS#8 PEM private key for certificates — **required in production** |
 
 ### Free model options
@@ -90,6 +92,7 @@ node -e "const {generateKeyPairSync}=require('crypto');console.log(generateKeyPa
 | `npm run db:seed` | Migrate + load the item bank and demo users (idempotent) |
 | `npm run db:reset` | Delete the local PGlite database and reseed |
 | `npm run db:generate` | Create a migration after editing `lib/server/db/schema.ts` |
+| `npm run db:admin -- <email>` | Grant the admin role to an existing account |
 
 ## API
 
@@ -106,6 +109,7 @@ All JSON. Authenticated routes use the session cookie set by login/sign-up.
 | `GET/POST /api/local-lab/runs` `{taskId, prompt}` | ✓ | Lab history / run a side-by-side comparison |
 | `GET /api/credentials` · `POST /api/credentials` `{track}` | ✓ | Track progress and certificates / issue one |
 | `GET /api/credentials/:id/verify` · `GET /api/credentials/public-key` | – | Public verification |
+| `GET/POST /api/admin/tasks` · `PATCH /api/admin/tasks/:id` · `POST /api/admin/tasks/:id/recalibrate` | admin | Item bank authoring, retirement and recalibration |
 | `GET /api/health` | – | DB + provider status |
 
 ## Project layout

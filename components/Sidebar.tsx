@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutGrid, ListChecks, Cpu, Trophy, User, LogOut } from "lucide-react";
+import { LayoutGrid, ListChecks, Cpu, Trophy, User, LogOut, Shield } from "lucide-react";
 import { Logo } from "./Logo";
 
-const items = [
+const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutGrid },
   { href: "/dashboard/tasks", label: "Tasks", icon: ListChecks },
   { href: "/dashboard/local-lab", label: "Local Lab", icon: Cpu },
@@ -13,9 +13,10 @@ const items = [
   { href: "/dashboard/profile", label: "Profile", icon: User },
 ];
 
-export type SidebarUser = { name: string; initials: string; level: number; title: string };
+export type SidebarUser = { name: string; initials: string; level: number; title: string; isAdmin?: boolean };
 
 export function Sidebar({ user }: { user: SidebarUser }) {
+  const items = user.isAdmin ? [...navItems, { href: "/dashboard/admin", label: "Admin", icon: Shield }] : navItems;
   const path = usePathname();
   const router = useRouter();
   const isActive = (href: string) =>
