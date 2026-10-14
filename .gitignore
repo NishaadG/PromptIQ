@@ -36,6 +36,7 @@ research/
 
 .vercel
 .env*
+!.env.example
 
 # local embedded database (PGlite)
 .data/
