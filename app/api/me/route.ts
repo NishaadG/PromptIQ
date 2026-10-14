@@ -17,7 +17,7 @@ export const PATCH = handler(async (req: Request) => {
 /** Permanently delete your account (password required). Certificates stop verifying. */
 export const DELETE = handler(async (req: Request) => {
   const user = await requireApiUser();
-  rateLimit(`delete:${user.id}`, 10, 15 * 60_000);
+  await rateLimit(`delete:${user.id}`, 10, 15 * 60_000);
   const { password } = await parseBody(req, confirmPasswordSchema);
   try {
     await deleteAccount(await getDb(), user, password);

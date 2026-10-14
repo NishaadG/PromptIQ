@@ -11,7 +11,7 @@ export const GET = handler(async () => {
 
 export const POST = handler(async (req: Request) => {
   const user = await requireApiUser();
-  rateLimit(`lab:${user.id}`, 20, 60_000);
+  await rateLimit(`lab:${user.id}`, 20, 60_000);
   const { taskId, prompt } = await parseBody(req, z.object({ taskId: z.string().min(1), prompt: z.string().min(1).max(8000) }));
   try {
     const { run, verdict } = await runLab(await getDb(), user, taskId, prompt);

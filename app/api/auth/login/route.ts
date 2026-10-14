@@ -5,7 +5,7 @@ import { clientKey, handler, HttpError, json, parseBody, rateLimit } from "@/lib
 import { AccountError, logIn, loginSchema } from "@/lib/server/services/accounts";
 
 export const POST = handler(async (req: Request) => {
-  rateLimit(`login:${clientKey(req)}`, 20, 15 * 60_000);
+  await rateLimit(`login:${clientKey(req)}`, 20, 15 * 60_000);
   const input = await parseBody(req, loginSchema);
   const db = await getDb();
   try {

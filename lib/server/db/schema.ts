@@ -158,3 +158,12 @@ export type User = typeof users.$inferSelect;
 export type Task = typeof tasks.$inferSelect;
 export type Attempt = typeof attempts.$inferSelect;
 export type Credential = typeof credentials.$inferSelect;
+
+/* ------------------------------------------------------------------ rate limiting */
+
+// Fixed-window counters shared by every server instance (in-memory limits don't survive serverless).
+export const rateLimits = pgTable("rate_limits", {
+  key: text("key").primaryKey(),
+  count: integer("count").notNull(),
+  resetAt: timestamp("reset_at", { withTimezone: true }).notNull(),
+});

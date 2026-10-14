@@ -7,7 +7,7 @@ import { AccountError, changePassword, passwordChangeSchema } from "@/lib/server
 /** Change password. Signs out every other device and issues this browser a fresh session. */
 export const POST = handler(async (req: Request) => {
   const user = await requireApiUser();
-  rateLimit(`password:${user.id}`, 10, 15 * 60_000);
+  await rateLimit(`password:${user.id}`, 10, 15 * 60_000);
   const input = await parseBody(req, passwordChangeSchema);
   const db = await getDb();
   try {

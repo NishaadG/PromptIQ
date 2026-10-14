@@ -1,6 +1,8 @@
 import "server-only";
 import { ZodError, type ZodType } from "zod";
 import { getCurrentUser } from "./dal";
+import { getDb } from "./db";
+import { hit } from "./rate-limit";
 import type { User } from "./db/schema";
 
 export class HttpError extends Error {
@@ -63,16 +65,13 @@ export async function requireApiUser(): Promise<User> {
   return user;
 }
 
-/* Simple in-memory fixed-window rate limiter (per instance; good enough to stop brute force). */
-const buckets = new Map<string, { count: number; reset: number }>();
-export function rateLimit(key: string, limit: number, windowMs: number) {
-  const now = Date.now();
-  const b = buckets.get(key);
-  if (!b || b.reset < now) {
-    buckets.set(key, { count: 1, reset: now + windowMs });
-    return;
+/** Throw 429 once `key` exceeds `limit` hits per window. Shared across instances via the database. */
+export async function rateLimit(key: string, limit: number, windowMs: number) {
+  const r = await hit(await getDb(), key, limit, windowMs);
+  if (!r.ok) {
+    const retry = Math.max(1, Math.ceil((r.resetAt.getTime() - Date.now()) / 1000));
+    throw new HttpError(429, "Too many requests — try again shortly", { retryAfterSeconds: retry });
   }
-  if (++b.count > limit) throw new HttpError(429, "Too many requests — try again shortly");
 }
 
 export function clientKey(req: Request) {

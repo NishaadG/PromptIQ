@@ -14,7 +14,7 @@ const body = z.object({
 /** Submit a prompt for a task: runs the model, scores the result, stores an unclaimed attempt. */
 export const POST = handler(async (req: NextRequest, ctx: RouteContext<"/api/tasks/[id]/attempts">) => {
   const user = await requireApiUser();
-  rateLimit(`attempt:${user.id}`, 30, 60_000);
+  await rateLimit(`attempt:${user.id}`, 30, 60_000);
   const { id } = await ctx.params;
   const { prompt, elapsedMs, pastedChars } = await parseBody(req, body);
   try {
