@@ -78,6 +78,8 @@ export const tasks = pgTable("tasks", {
 /* ------------------------------------------------------------------ attempts */
 
 export type DetectedTechnique = { id: string; name: string; evidence: string };
+export type IntegrityFlag = "implausible_typing_speed" | "mostly_pasted" | "sudden_jump";
+export type IntegrityInfo = { flags: IntegrityFlag[]; elapsedMs?: number; pastedChars?: number };
 export type FeedbackItem = { kind: "cost" | "win" | "tip" | "warn"; text: string; source?: string };
 
 export const attempts = pgTable(
@@ -104,6 +106,8 @@ export const attempts = pgTable(
     reward: integer("reward").notNull(),
     bonus: integer("bonus").notNull(),
     claimed: boolean("claimed").notNull().default(false),
+    // Behavioural integrity signals (never penalise practice; flagged attempts don't count toward certificates)
+    integrity: jsonb("integrity").$type<IntegrityInfo>().notNull().default({ flags: [] }),
     createdAt: createdAt(),
   },
   (t) => [index("attempts_user_idx").on(t.userId, t.createdAt), index("attempts_task_idx").on(t.taskId)],

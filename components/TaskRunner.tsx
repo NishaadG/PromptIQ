@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Check, CornerDownLeft, Lightbulb, RotateCcw, Sparkles, TrendingDown, TriangleAlert, X } from "lucide-react";
@@ -18,6 +18,10 @@ export function TaskRunner({ task, balance, priorAttempts }: { task: ClientTask;
   const [error, setError] = useState<string | null>(null);
   const [shown, setShown] = useState(0);
   const [attemptNo, setAttemptNo] = useState(priorAttempts + 1);
+  // Integrity signals: when drafting began and how much text arrived by paste / sample insertion.
+  const startedAt = useRef<number | null>(null);
+  const pastedChars = useRef(0);
+  const insertSample = () => { pastedChars.current += task.samplePrompt.length; setPrompt(task.samplePrompt); };
 
   const paragraphs = attempt ? attempt.response.split(/\n\s*\n/).filter((p) => p.trim()) : [];
   const usesContext = prompt.includes("{{context}}");
@@ -25,13 +29,14 @@ export function TaskRunner({ task, balance, priorAttempts }: { task: ClientTask;
 
   async function submit() {
     const text = prompt.trim() || task.samplePrompt;
-    if (!prompt.trim()) setPrompt(text);
+    if (!prompt.trim()) insertSample();
+    const behaviour = { elapsedMs: startedAt.current ? Math.round(Date.now() - startedAt.current) : undefined, pastedChars: pastedChars.current };
     setError(null);
     setPhase("running");
     setShown(0);
     try {
       const res = await fetch(`/api/tasks/${task.id}/attempts`, {
-        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ prompt: text }),
+        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ prompt: text, ...behaviour }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Something went wrong");
@@ -100,7 +105,8 @@ export function TaskRunner({ task, balance, priorAttempts }: { task: ClientTask;
               <textarea
                 id="prompt"
                 value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
+                onChange={(e) => { startedAt.current ??= Date.now(); setPrompt(e.target.value); }}
+                onPaste={(e) => { startedAt.current ??= Date.now(); pastedChars.current += e.clipboardData.getData("text").length; }}
                 onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && phase === "idle") submit(); }}
                 disabled={phase !== "idle"}
                 rows={10}
@@ -110,7 +116,7 @@ export function TaskRunner({ task, balance, priorAttempts }: { task: ClientTask;
               />
               <div className="flex items-center justify-between border-t border-line px-4 py-2.5">
                 {phase === "idle" ? (
-                  <button type="button" onClick={() => setPrompt(task.samplePrompt)} className="text-[0.8rem] text-mute underline decoration-line-2 underline-offset-4 hover:text-ink">
+                  <button type="button" onClick={insertSample} className="text-[0.8rem] text-mute underline decoration-line-2 underline-offset-4 hover:text-ink">
                     Use a sample prompt
                   </button>
                 ) : (

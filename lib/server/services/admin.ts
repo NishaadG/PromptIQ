@@ -1,5 +1,5 @@
 /** Item-bank administration: authoring, statistics and empirical recalibration of tasks. */
-import { asc, eq, sql } from "drizzle-orm";
+import { asc, desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { DB } from "../db/client";
 import { attempts, tasks, users, type User } from "../db/schema";
@@ -107,4 +107,19 @@ export async function recalibrateTask(db: DB, id: string) {
     .where(eq(tasks.id, id))
     .returning();
   return { ok: true as const, task: row };
+}
+
+/** Recent attempts carrying any integrity flag, for human review (signals, not verdicts). */
+export async function flaggedAttempts(db: DB, limit = 50) {
+  return db
+    .select({
+      id: attempts.id, createdAt: attempts.createdAt, taskSuccess: attempts.taskSuccess, integrity: attempts.integrity,
+      promptChars: sql<number>`length(${attempts.prompt})`, handle: users.handle, taskTitle: tasks.title,
+    })
+    .from(attempts)
+    .innerJoin(users, eq(users.id, attempts.userId))
+    .innerJoin(tasks, eq(tasks.id, attempts.taskId))
+    .where(sql`jsonb_array_length(${attempts.integrity}->'flags') > 0`)
+    .orderBy(desc(attempts.createdAt))
+    .limit(limit);
 }

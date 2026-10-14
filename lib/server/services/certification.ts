@@ -22,12 +22,15 @@ function levelFor(avg: number): "Foundational" | "Practitioner" | "Expert" {
   return avg >= 95 ? "Expert" : avg >= 90 ? "Practitioner" : "Foundational";
 }
 
-/** Per track: how many tasks are passed (best claimed score ≥ PASS) and whether it is certifiable. */
+/**
+ * Per track: how many tasks are passed (best claimed score ≥ PASS) and whether it is certifiable.
+ * Attempts with a disqualifying integrity flag (see scoring/integrity.ts) are not certification evidence.
+ */
 export async function trackProgress(db: DB, userId: string) {
   const rows = await db
     .select({
       track: tasks.category, taskId: tasks.id,
-      best: sql<number | null>`max(${attempts.taskSuccess}) filter (where ${attempts.claimed})`,
+      best: sql<number | null>`max(${attempts.taskSuccess}) filter (where ${attempts.claimed} and not (${attempts.integrity}->'flags' @> '["implausible_typing_speed"]'::jsonb))`,
     })
     .from(tasks)
     .leftJoin(attempts, and(eq(attempts.taskId, tasks.id), eq(attempts.userId, userId)))

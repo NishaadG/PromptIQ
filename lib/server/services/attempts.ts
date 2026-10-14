@@ -5,6 +5,10 @@ import { attempts, tasks, users, type Task, type User } from "../db/schema";
 import { composeUserMessage, getProvider, type LlmProvider } from "../llm";
 import { judgeCriteria } from "../judge";
 import { computeReward, nextStreak, scoreAttempt, updateRatings, xpForAttempt } from "../../scoring";
+import { integritySignals } from "../../scoring/integrity";
+
+/** Client-reported behaviour for integrity signals (optional; never trusted for scoring). */
+export type AttemptBehaviour = { elapsedMs?: number; pastedChars?: number };
 
 export const MAX_PROMPT_CHARS = 8000;
 export const MAX_ATTEMPTS_PER_TASK_PER_DAY = 10;
@@ -16,7 +20,9 @@ export class AttemptError extends Error {
 }
 
 /** Run the learner's prompt through the model, score it, and store the attempt (unclaimed). */
-export async function runAttempt(db: DB, user: User, taskId: string, prompt: string, provider: LlmProvider = getProvider()) {
+export async function runAttempt(
+  db: DB, user: User, taskId: string, prompt: string, provider: LlmProvider = getProvider(), behaviour: AttemptBehaviour = {},
+) {
   const trimmed = prompt.trim();
   if (!trimmed) throw new AttemptError(400, "Prompt is empty");
   if (trimmed.length > MAX_PROMPT_CHARS) throw new AttemptError(400, `Prompt is too long (max ${MAX_PROMPT_CHARS} characters)`);
@@ -36,6 +42,10 @@ export async function runAttempt(db: DB, user: User, taskId: string, prompt: str
   const judged = await judgeCriteria(provider, task.rubric, { brief: task.brief, response: completion.text });
   const s = scoreAttempt({ task, prompt: trimmed, response: completion.text, promptTokens: completion.inputTokens, outputTokens: completion.outputTokens, judged });
   const { reward, bonus } = computeReward(task.reward, s.taskSuccess, s.efficiency);
+  const integrity = integritySignals({
+    promptChars: trimmed.length, ...behaviour, taskSuccess: s.taskSuccess,
+    expectedSuccess: updateRatings(user.rating, task.difficultyRating, s.taskSuccess).expected,
+  });
 
   const [{ n: prior }] = await db.select({ n: count() }).from(attempts).where(and(eq(attempts.userId, user.id), eq(attempts.taskId, task.id)));
   const [row] = await db
@@ -45,7 +55,7 @@ export async function runAttempt(db: DB, user: User, taskId: string, prompt: str
       prompt: trimmed, response: completion.text, provider: completion.provider, model: completion.model,
       promptTokens: completion.inputTokens, outputTokens: completion.outputTokens, totalTokens: s.totalTokens,
       latencyMs: completion.latencyMs, taskSuccess: s.taskSuccess, efficiency: s.efficiency, clarity: s.clarity,
-      criteria: s.criteria, techniques: s.techniques, feedback: s.feedback, reward, bonus,
+      criteria: s.criteria, techniques: s.techniques, feedback: s.feedback, reward, bonus, integrity,
     })
     .returning();
   return { attempt: row, task, percentile: await percentileOf(db, task.id, s.taskSuccess) };

@@ -15,6 +15,13 @@
       "when": 1792003163473,
       "tag": "0001_local_lab",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792003728372,
+      "tag": "0002_integrity",
+      "breakpoints": true
     }
   ]
 }

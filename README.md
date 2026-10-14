@@ -34,6 +34,7 @@ once a track is passed → open its public verification link.
 | Teams | Learners set an organisation; the Team page shows members' levels, success, efficiency and certificates, plus organisational AI-readiness (share certified, averages, tokens saved vs. task medians) |
 | Item bank admin | Admins author/edit tasks with a validated rubric schema, retire tasks, see per-item statistics from real learners (attempts, mean, pass rate, observed medians) and recalibrate benchmarks from data. Grant admin with `npm run db:admin -- you@example.com` or `ADMIN_EMAILS` |
 | Certificates | Ed25519-signed credentials per track (all tasks passed at 85+), 24-month expiry, public `/verify/<id>` page, machine verification API and published public key; tamper detection |
+| Integrity signals | Typing speed and paste volume recorded per attempt; superhuman-speed attempts are excluded from certification evidence; paste and unlikely-jump flags are informational; admin review list. Signals, never automatic accusations |
 
 ## Configuration (`.env.local`)
 

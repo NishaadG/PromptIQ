@@ -1,0 +1,1 @@
+ALTER TABLE "attempts" ADD COLUMN "integrity" jsonb DEFAULT '{"flags":[]}'::jsonb NOT NULL;
