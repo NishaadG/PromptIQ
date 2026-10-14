@@ -1,19 +1,29 @@
-import { currentUser, recentActivity } from "@/lib/mock-data";
 import { PageHeader } from "@/components/PageHeader";
+import { getDb } from "@/lib/server/db";
+import { requireUser } from "@/lib/server/dal";
+import { listUserAttempts } from "@/lib/server/services/attempts";
+import { dashboardStats, listTasksForUser } from "@/lib/server/services/catalog";
+import { progressOf } from "@/lib/server/services/present";
 
-export default function Profile() {
-  const u = currentUser;
+export default async function Profile() {
+  const user = await requireUser();
+  const db = await getDb();
+  const [stats, history, tasks] = await Promise.all([dashboardStats(db, user.id), listUserAttempts(db, user.id, 15), listTasksForUser(db, user.id)]);
+  const p = progressOf(user);
   return (
     <div className="rise">
-      <PageHeader eyebrow="Profile" title={u.name} />
+      <PageHeader eyebrow={`Profile · @${user.handle}`} title={user.name} />
       <section className="grid gap-12 px-5 py-10 md:px-10 lg:grid-cols-[1fr_1.4fr]">
         <dl className="border-t border-ink">
           {[
-            ["Level", `${u.level} — ${u.levelTitle}`],
-            ["Token balance", u.tokens.toLocaleString()],
-            ["Current streak", `${u.streak} days`],
-            ["Average efficiency", "88"],
-            ["Tasks completed", "47"],
+            ["Level", `${p.level} — ${p.title}`],
+            ["Token balance", p.tokens.toLocaleString()],
+            ["Current streak", `${p.streak} ${p.streak === 1 ? "day" : "days"} (best ${p.longestStreak})`],
+            ["Skill rating", String(p.rating)],
+            ["Average task success", stats.attempts ? String(stats.avgSuccess) : "—"],
+            ["Average efficiency", stats.attempts ? String(stats.avgEfficiency) : "—"],
+            ["Tasks completed", `${tasks.filter((t) => t.status === "done").length} of ${tasks.length}`],
+            ["LLM tokens spent", stats.llmTokensSpent.toLocaleString()],
           ].map(([k, v]) => (
             <div key={k} className="flex items-baseline gap-3 border-b border-line py-4">
               <dt className="text-ink-2">{k}</dt>
@@ -23,23 +33,14 @@ export default function Profile() {
           ))}
         </dl>
         <div>
-          <p className="eyebrow">Certificates</p>
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            {u.certifiedTracks.map((c) => (
-              <div key={c} className="grain border border-ink bg-card p-6">
-                <div className="font-mono text-[0.62rem] uppercase tracking-[0.18em] text-rust">Certified · Level I</div>
-                <div className="font-display mt-6 text-[1.7rem] leading-tight">{c}</div>
-                <div className="mt-6 border-t border-line pt-3 font-mono text-[0.65rem] text-mute">PIQ-{c.slice(0, 3).toUpperCase()}-2026-0913</div>
-              </div>
-            ))}
-          </div>
-          <p className="eyebrow mt-12">History</p>
+          <p className="eyebrow">History</p>
           <ul className="mt-2">
-            {recentActivity.map((a) => (
-              <li key={a.label} className="flex items-baseline gap-4 border-b border-line py-3 text-[0.92rem]">
-                <span className="font-display w-8 text-lg">{a.score}</span>
-                <span className="flex-1">{a.label}</span>
-                <span className="font-mono text-[0.7rem] text-mute">{a.when}</span>
+            {history.length === 0 && <li className="border-b border-line py-3 text-[0.92rem] text-ink-2">No attempts yet.</li>}
+            {history.map((a) => (
+              <li key={a.id} className="flex items-baseline gap-4 border-b border-line py-3 text-[0.92rem]">
+                <span className="font-display w-8 text-lg">{a.taskSuccess}</span>
+                <span className="flex-1">{a.title}</span>
+                <span className="font-mono text-[0.7rem] text-mute">{a.totalTokens} tk · {a.claimed ? "claimed" : "unclaimed"} · {a.createdAt.toLocaleDateString("en-GB")}</span>
               </li>
             ))}
           </ul>

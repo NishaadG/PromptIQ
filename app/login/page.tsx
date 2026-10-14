@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowRight, Loader2 } from "lucide-react";
 import { Logo } from "@/components/Logo";
-import { signIn } from "@/lib/session";
 
 export default function LoginPage() {
   return (
@@ -22,12 +21,30 @@ function LoginInner() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    signIn(email || "demo@promptiq.dev");
-    setTimeout(() => router.push("/dashboard"), 550);
+    setError(null);
+    try {
+      const res = await fetch(`/api/auth/${mode === "login" ? "login" : "signup"}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const issue = Array.isArray(data.details) ? data.details[0]?.message : null;
+        throw new Error(issue ?? data.error ?? "Something went wrong");
+      }
+      const next = params.get("next");
+      router.push(next && next.startsWith("/dashboard") ? next : "/dashboard");
+      router.refresh();
+    } catch (err) {
+      setError((err as Error).message);
+      setLoading(false);
+    }
   }
 
   return (
@@ -90,8 +107,11 @@ function LoginInner() {
             </button>
           </form>
 
+          {error && <p role="alert" className="mt-6 border border-rust bg-rust-soft/40 px-4 py-3 text-[0.88rem] text-rust">{error}</p>}
+
           <p className="mt-8 border-t border-line pt-5 font-mono text-[0.7rem] leading-relaxed text-mute">
-            Demo build — any email and password will work. Nothing leaves your browser.
+            Try it without signing up: <button type="button" className="underline underline-offset-4 hover:text-ink" onClick={() => { setMode("login"); setEmail("demo@promptiq.dev"); setPassword("promptiq-demo"); }}>use the demo account</button>.
+            {mode === "signup" && " Passwords need at least 8 characters."}
           </p>
         </div>
       </main>

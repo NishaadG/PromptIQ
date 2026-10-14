@@ -4,8 +4,6 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { LayoutGrid, ListChecks, Cpu, Trophy, User, LogOut } from "lucide-react";
 import { Logo } from "./Logo";
-import { currentUser } from "@/lib/mock-data";
-import { signOut } from "@/lib/session";
 
 const items = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutGrid },
@@ -15,11 +13,13 @@ const items = [
   { href: "/dashboard/profile", label: "Profile", icon: User },
 ];
 
-export function Sidebar() {
+export type SidebarUser = { name: string; initials: string; level: number; title: string };
+
+export function Sidebar({ user }: { user: SidebarUser }) {
   const path = usePathname();
   const router = useRouter();
   const isActive = (href: string) =>
-    href === "/dashboard" ? path === "/dashboard" : path.startsWith(href) || (href === "/dashboard/tasks" && path === "/dashboard/task");
+    href === "/dashboard" ? path === "/dashboard" : path.startsWith(href) || (href === "/dashboard/tasks" && path.startsWith("/dashboard/task/"));
 
   return (
     <>
@@ -46,14 +46,14 @@ export function Sidebar() {
         </nav>
         <div className="border-t border-line p-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center bg-ink font-display text-sm italic text-paper">{currentUser.initials}</div>
+            <div className="flex h-9 w-9 items-center justify-center bg-ink font-display text-sm italic text-paper">{user.initials}</div>
             <div className="min-w-0 flex-1">
-              <div className="truncate text-sm font-medium">{currentUser.name}</div>
-              <div className="text-[0.72rem] text-mute">Level {currentUser.level} · {currentUser.levelTitle}</div>
+              <div className="truncate text-sm font-medium">{user.name}</div>
+              <div className="text-[0.72rem] text-mute">Level {user.level} · {user.title}</div>
             </div>
             <button
               title="Sign out"
-              onClick={() => { signOut(); router.push("/"); }}
+              onClick={async () => { await fetch("/api/auth/logout", { method: "POST" }); router.push("/"); router.refresh(); }}
               className="p-1.5 text-mute hover:text-rust"
             >
               <LogOut size={15} strokeWidth={1.5} />

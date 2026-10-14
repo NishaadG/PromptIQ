@@ -93,3 +93,12 @@ describe("research-backed feedback", () => {
     expect(fb.some((f) => f.kind === "cost" && /few-shot/i.test(f.text))).toBe(true);
   });
 });
+
+describe("technique detection edge cases", () => {
+  it("distinguishes a task framing from a role, and catches audience phrasing", () => {
+    const p = "You're helping a small-business owner who isn't a lawyer.";
+    expect(ids(p)).not.toContain("role");
+    expect(ids(p)).toContain("audience");
+    expect(ids("You are a senior Python engineer.")).toContain("role");
+  });
+});
