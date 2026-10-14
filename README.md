@@ -25,7 +25,7 @@ once a track is passed → open its public verification link.
 | Area | Implementation |
 |---|---|
 | Accounts | scrypt-hashed passwords; database-backed sessions (only a SHA-256 of the token is stored) in an httpOnly cookie; rate-limited login/sign-up |
-| Item bank | 7 tasks across summarization, extraction, rewriting, explanation, classification and reasoning, each with a source text, a weighted rubric, a sample prompt and median benchmarks |
+| Item bank | 10 tasks across summarization, extraction, rewriting, explanation, classification, reasoning, code review and grounded Q&A, each with a source text, a weighted rubric, a sample prompt and median benchmarks |
 | Scoring | Rubric criteria (`includes_any/all`, `excludes`, `max_words`, `min_items`, `json_fields`, `regex`, optional `llm_judge`); real BPE token counts; **efficiency** = success adjusted for token spend vs. the median solver; **clarity** = readability of the output |
 | Feedback | Detects the prompting techniques used (few-shot, chain-of-thought, role, structured output, answer-only, audience, length limits) and gives evidence-based feedback, e.g. the cost of few-shot examples and the "answer-only" compliance trap on reasoning tasks |
 | Progression | Rewards with an anti-farming rule (you earn your *best* result per task once), XP and levels, daily streaks, an Elo-style skill rating, adaptive task recommendation |
