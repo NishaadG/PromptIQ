@@ -117,6 +117,17 @@ All JSON. Authenticated routes use the session cookie set by login/sign-up.
 | `GET/POST /api/admin/tasks` · `PATCH /api/admin/tasks/:id` · `POST /api/admin/tasks/:id/recalibrate` | admin | Item bank authoring, retirement and recalibration |
 | `GET /api/health` | – | DB + provider status |
 
+## Security
+
+- Passwords: scrypt with per-user salt; login runs a hash comparison even for unknown emails (no timing oracle).
+- Sessions: random 256-bit token in an httpOnly, SameSite=Lax cookie (Secure in production); only its SHA-256 is stored. Changing the password revokes every session.
+- CSRF: on top of SameSite, every state-changing API request with a foreign `Origin` is rejected.
+- Rate limits: fixed-window counters in the database (`rate_limits`), so they hold across serverless instances — login, sign-up, attempts, lab runs, password change, export and deletion.
+- Headers: `nosniff`, `X-Frame-Options: DENY` / `frame-ancestors 'none'`, strict referrer policy, restrictive `Permissions-Policy`, HSTS in production.
+- Certificates: Ed25519-signed; production refuses to start signing without `PROMPTIQ_SIGNING_KEY`.
+- Item bank secrecy: rubrics and reference responses never leave the server.
+- Privacy: users can download all their data (`/api/me/export`) and delete their account.
+
 ## Project layout
 
 ```

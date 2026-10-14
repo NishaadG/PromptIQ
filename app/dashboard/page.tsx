@@ -155,7 +155,7 @@ export default async function Dashboard() {
               <li key={a.id} className="flex items-center gap-4 border-b border-line py-4">
                 <span className={`font-display w-10 text-[1.6rem] leading-none ${a.taskSuccess >= 90 ? "text-olive" : a.taskSuccess < 80 ? "text-rust" : ""}`}>{a.taskSuccess}</span>
                 <div className="flex-1">
-                  <div className="text-[0.92rem]">{a.title}</div>
+                  <Link href={`/dashboard/attempt/${a.id}`} className="text-[0.92rem] underline-offset-4 hover:underline">{a.title}</Link>
                   <div className="font-mono text-[0.7rem] text-mute">{a.totalTokens} tokens · {ago(a.createdAt)}</div>
                 </div>
               </li>

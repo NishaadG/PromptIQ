@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { PageHeader } from "@/components/PageHeader";
 import { getDb } from "@/lib/server/db";
 import { requireUser } from "@/lib/server/dal";
@@ -51,7 +52,7 @@ export default async function Profile() {
             {history.map((a) => (
               <li key={a.id} className="flex items-baseline gap-4 border-b border-line py-3 text-[0.92rem]">
                 <span className="font-display w-8 text-lg">{a.taskSuccess}</span>
-                <span className="flex-1">{a.title}</span>
+                <Link href={`/dashboard/attempt/${a.id}`} className="flex-1 underline-offset-4 hover:underline">{a.title}</Link>
                 <span className="font-mono text-[0.7rem] text-mute">{a.totalTokens} tk · {a.claimed ? "claimed" : "unclaimed"} · {a.createdAt.toLocaleDateString("en-GB")}</span>
               </li>
             ))}
