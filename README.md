@@ -95,6 +95,7 @@ node -e "const {generateKeyPairSync}=require('crypto');console.log(generateKeyPa
 | `npm run db:reset` | Delete the local PGlite database and reseed |
 | `npm run db:generate` | Create a migration after editing `lib/server/db/schema.ts` |
 | `npm run db:admin -- <email>` | Grant the admin role to an existing account |
+| `npm run db:set-password -- <email>` | Forgotten password: prints a temporary password and signs the user out everywhere (no email service needed) |
 
 ## API
 

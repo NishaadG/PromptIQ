@@ -4,6 +4,7 @@
  *   npm run db:seed      migrate + upsert the item bank + demo users
  *   npm run db:reset     delete the local PGlite store, then seed
  *   npm run db:admin -- you@example.com   grant the admin role to an existing account
+ *   npm run db:set-password -- user@example.com   issue a temporary password (no email service needed)
  */
 import { rmSync } from "node:fs";
 import path from "node:path";
@@ -11,6 +12,9 @@ import { closeDb, getDb } from "../lib/server/db/client";
 import { seed } from "../lib/server/db/seed";
 import { users } from "../lib/server/db/schema";
 import { eq } from "drizzle-orm";
+import { randomBytes } from "node:crypto";
+import { hashPassword } from "../lib/server/auth/password";
+import { deleteUserSessions } from "../lib/server/auth/sessions";
 
 async function main() {
   const cmd = process.argv[2];
@@ -29,6 +33,16 @@ async function main() {
     const email = (process.argv[3] ?? "").toLowerCase();
     const rows = await db.update(users).set({ role: "admin" }).where(eq(users.email, email)).returning({ id: users.id });
     console.log(rows.length ? `${email} is now an admin` : `no account with email ${email}`);
+  }
+  if (cmd === "set-password") {
+    const email = (process.argv[3] ?? "").toLowerCase();
+    const temp = randomBytes(9).toString("base64url"); // 12 characters, ~72 bits
+    const rows = await db.update(users).set({ passwordHash: await hashPassword(temp) }).where(eq(users.email, email)).returning({ id: users.id });
+    if (rows.length) {
+      await deleteUserSessions(db, rows[0].id);
+      console.log(`temporary password for ${email}: ${temp}
+all their sessions were signed out — ask them to change it under Profile.`);
+    } else console.log(`no account with email ${email}`);
   }
   await closeDb();
 }

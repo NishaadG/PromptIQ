@@ -12,7 +12,8 @@
     "db:migrate": "tsx scripts/db.ts migrate",
     "db:seed": "tsx scripts/db.ts seed",
     "db:reset": "tsx scripts/db.ts reset",
-    "db:admin": "tsx scripts/db.ts admin"
+    "db:admin": "tsx scripts/db.ts admin",
+    "db:set-password": "tsx scripts/db.ts set-password"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.10",
