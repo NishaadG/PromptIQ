@@ -102,3 +102,19 @@ describe("local lab", () => {
     expect(h[0]).toMatchObject({ category: "Reasoning", runs: 2 });
   });
 });
+
+describe("team", () => {
+  it("groups members by organisation and summarises readiness", async () => {
+    const { teamOverview, updateProfile } = await import("@/lib/server/services/team");
+    const a = await signUp(db, { email: "t1@acme.com", password: "password123", org: "Acme" });
+    const b = await signUp(db, { email: "t2@acme.com", password: "password123" });
+    expect(await updateProfile(db, b.id, { org: "ACME" })).toMatchObject({ org: "ACME" });
+    const r = await runAttempt(db, a, "invoice-extract-02", SEED_TASKS[1].samplePrompt, simulatedProvider);
+    await claimAttempt(db, a, r.attempt.id);
+    const t = await teamOverview(db, "acme");
+    expect(t?.summary.members).toBe(2);
+    expect(t?.summary.activeMembers).toBe(1);
+    expect(t?.members[0].tasksCompleted).toBe(1);
+    expect(await teamOverview(db, "nobody-org")).toBeNull();
+  });
+});

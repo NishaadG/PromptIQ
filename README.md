@@ -31,6 +31,7 @@ once a track is passed → open its public verification link.
 | Progression | Rewards with an anti-farming rule (you earn your *best* result per task once), XP and levels, daily streaks, an Elo-style skill rating, adaptive task recommendation |
 | Leaderboards | All-time (balance) and this week (tokens earned in the last 7 days) |
 | Local Lab | Same prompt on a cloud model and a small local model, scored side by side with cost and latency; history by task type |
+| Teams | Learners set an organisation; the Team page shows members' levels, success, efficiency and certificates, plus organisational AI-readiness (share certified, averages, tokens saved vs. task medians) |
 | Item bank admin | Admins author/edit tasks with a validated rubric schema, retire tasks, see per-item statistics from real learners (attempts, mean, pass rate, observed medians) and recalibrate benchmarks from data. Grant admin with `npm run db:admin -- you@example.com` or `ADMIN_EMAILS` |
 | Certificates | Ed25519-signed credentials per track (all tasks passed at 85+), 24-month expiry, public `/verify/<id>` page, machine verification API and published public key; tamper detection |
 
@@ -101,7 +102,8 @@ All JSON. Authenticated routes use the session cookie set by login/sign-up.
 | Method & path | Auth | Purpose |
 |---|---|---|
 | `POST /api/auth/signup` · `POST /api/auth/login` · `POST /api/auth/logout` | – | Session management |
-| `GET /api/me` · `GET /api/me/dashboard` | ✓ | Current user; dashboard payload |
+| `GET/PATCH /api/me` · `GET /api/me/dashboard` | ✓ | Current user (update name/organisation); dashboard payload |
+| `GET /api/team` | ✓ | Your organisation's members and readiness summary |
 | `GET /api/tasks` · `GET /api/tasks/:id` | ✓ | Item bank (rubric internals are never exposed) |
 | `POST /api/tasks/:id/attempts` `{prompt}` | ✓ | Run + score a prompt (creates an unclaimed attempt) |
 | `POST /api/attempts/:id/claim` | ✓ | Claim the reward (pays only improvements on your best) |

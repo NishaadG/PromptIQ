@@ -6,6 +6,7 @@ import { dashboardStats, listTasksForUser } from "@/lib/server/services/catalog"
 import { progressOf } from "@/lib/server/services/present";
 import { listCredentials, trackProgress } from "@/lib/server/services/certification";
 import { Certificates } from "@/components/Certificates";
+import { ProfileForm } from "@/components/ProfileForm";
 
 export default async function Profile() {
   const user = await requireUser();
@@ -19,6 +20,7 @@ export default async function Profile() {
     <div className="rise">
       <PageHeader eyebrow={`Profile · @${user.handle}`} title={user.name} />
       <section className="grid gap-12 px-5 py-10 md:px-10 lg:grid-cols-[1fr_1.4fr]">
+        <div>
         <dl className="border-t border-ink">
           {[
             ["Level", `${p.level} — ${p.title}`],
@@ -37,6 +39,8 @@ export default async function Profile() {
             </div>
           ))}
         </dl>
+        <ProfileForm name={user.name} org={user.org} />
+        </div>
         <div>
           <Certificates tracks={tracks} held={held.map((c) => ({ id: c.id, track: c.track, level: c.level, score: c.score, expiresAt: c.expiresAt.toISOString(), revoked: c.revoked }))} />
           <p className="eyebrow mt-12">History</p>

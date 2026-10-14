@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutGrid, ListChecks, Cpu, Trophy, User, LogOut, Shield } from "lucide-react";
+import { LayoutGrid, ListChecks, Cpu, Trophy, User, LogOut, Shield, Users } from "lucide-react";
 import { Logo } from "./Logo";
 
 const navItems = [
@@ -10,6 +10,7 @@ const navItems = [
   { href: "/dashboard/tasks", label: "Tasks", icon: ListChecks },
   { href: "/dashboard/local-lab", label: "Local Lab", icon: Cpu },
   { href: "/dashboard/leaderboard", label: "Leaderboard", icon: Trophy },
+  { href: "/dashboard/team", label: "Team", icon: Users },
   { href: "/dashboard/profile", label: "Profile", icon: User },
 ];
 
