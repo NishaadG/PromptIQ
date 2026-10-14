@@ -102,3 +102,19 @@ describe("technique detection edge cases", () => {
     expect(ids("You are a senior Python engineer.")).toContain("role");
   });
 });
+
+describe("llm judge", () => {
+  it("asks a real provider and parses YES/NO; skips the simulator", async () => {
+    const { judgeCriteria } = await import("@/lib/server/judge");
+    const crit = [{ kind: "llm_judge" as const, label: "Tone is respectful", question: "Is the tone respectful?", weight: 1 }];
+    const fake = (answer: string) => ({
+      name: "fake",
+      complete: async () => ({ text: answer, model: "m", provider: "fake", inputTokens: 1, outputTokens: 1, latencyMs: 1 }),
+    });
+    expect(await judgeCriteria(fake("YES."), crit, { brief: "b", response: "r" })).toEqual({ "Tone is respectful": true });
+    expect(await judgeCriteria(fake("no"), crit, { brief: "b", response: "r" })).toEqual({ "Tone is respectful": false });
+    expect(await judgeCriteria(fake("maybe"), crit, { brief: "b", response: "r" })).toEqual({});
+    const { simulatedProvider } = await import("@/lib/server/llm");
+    expect(await judgeCriteria(simulatedProvider, crit, { brief: "b", response: "r" })).toEqual({});
+  });
+});

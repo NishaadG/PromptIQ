@@ -3,6 +3,7 @@ import { and, count, desc, eq, sql } from "drizzle-orm";
 import type { DB } from "../db/client";
 import { attempts, tasks, users, type Task, type User } from "../db/schema";
 import { composeUserMessage, getProvider, type LlmProvider } from "../llm";
+import { judgeCriteria } from "../judge";
 import { computeReward, nextStreak, scoreAttempt, updateRatings, xpForAttempt } from "../../scoring";
 
 export const MAX_PROMPT_CHARS = 8000;
@@ -32,7 +33,8 @@ export async function runAttempt(db: DB, user: User, taskId: string, prompt: str
 
   const message = composeUserMessage(trimmed, task.context);
   const completion = await provider.complete({ user: message, maxTokens: Math.max(256, task.tokenBudget), task, learnerPrompt: trimmed });
-  const s = scoreAttempt({ task, prompt: trimmed, response: completion.text, promptTokens: completion.inputTokens, outputTokens: completion.outputTokens });
+  const judged = await judgeCriteria(provider, task.rubric, { brief: task.brief, response: completion.text });
+  const s = scoreAttempt({ task, prompt: trimmed, response: completion.text, promptTokens: completion.inputTokens, outputTokens: completion.outputTokens, judged });
   const { reward, bonus } = computeReward(task.reward, s.taskSuccess, s.efficiency);
 
   const [{ n: prior }] = await db.select({ n: count() }).from(attempts).where(and(eq(attempts.userId, user.id), eq(attempts.taskId, task.id)));
