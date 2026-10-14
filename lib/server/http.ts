@@ -12,10 +12,31 @@ export class HttpError extends Error {
 export const json = (data: unknown, init?: number | ResponseInit) =>
   Response.json(data, typeof init === "number" ? { status: init } : init);
 
-/** Wrap a route handler: maps HttpError/ZodError to JSON error responses, hides internal errors. */
+const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+
+/**
+ * CSRF defence in depth (the session cookie is already SameSite=Lax): a state-changing request
+ * that carries an Origin header must come from this site's own host.
+ */
+export function assertSameOrigin(req: Request) {
+  if (SAFE_METHODS.has(req.method)) return;
+  const origin = req.headers.get("origin");
+  if (!origin) return; // non-browser clients (curl, server-to-server) don't send Origin
+  const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host");
+  let originHost: string;
+  try {
+    originHost = new URL(origin).host;
+  } catch {
+    throw new HttpError(403, "Cross-site request blocked");
+  }
+  if (!host || originHost !== host) throw new HttpError(403, "Cross-site request blocked");
+}
+
+/** Wrap a route handler: same-origin check, maps HttpError/ZodError to JSON error responses, hides internal errors. */
 export function handler<A extends unknown[]>(fn: (...args: A) => Promise<Response>) {
   return async (...args: A): Promise<Response> => {
     try {
+      if (args[0] instanceof Request) assertSameOrigin(args[0]);
       return await fn(...args);
     } catch (e) {
       if (e instanceof HttpError) return json({ error: e.message, details: e.details }, e.status);
