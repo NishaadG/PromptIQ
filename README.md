@@ -31,6 +31,10 @@ once a track is passed → open its public verification link.
 | Progression | Rewards with an anti-farming rule (you earn your *best* result per task once), XP and levels, daily streaks, an Elo-style skill rating, adaptive task recommendation |
 | Leaderboards | All-time (balance) and this week (tokens earned in the last 7 days) |
 | Local Lab | Same prompt on a cloud model and a small local model, scored side by side with cost and latency; history by task type |
+| Routing engine | In the Local Lab, recommends local or cloud with R = 0.7Q − 0.12C − 0.06L − 0.12P (quality, cost, latency, privacy); personal data in the prompt or source text counts against external models |
+| Prompt Efficiency Score | Quality, accuracy, tokens, latency and cost on a 0–1 scale; the success-gated form (resource terms count only in proportion to accuracy) is shown on every result |
+| Privacy gateway | Prompts are scanned for personal data (email, phone, card, Aadhaar, PAN, account, IP) and secrets (API keys, private keys). Secrets are refused; personal data is masked before it reaches an external model |
+| Agents | An orchestrator with per-agent tool allow-lists, step and token budgets, a step log and admin approval. **AI Tutor** (three-level hints that never write the prompt), **Prompt Optimiser** (rewrite, re-run, reflect; practice only), **Curriculum Planner** (next three tasks from the Elo rating and learner habits), **Integrity Reviewer** and **Task Author** (both propose; an admin approves). Scripted policies by default; `AGENT_POLICY=llm` lets a configured model choose each step |
 | Teams | Learners set an organisation; the Team page shows members' levels, success, efficiency and certificates, plus organisational AI-readiness (share certified, averages, tokens saved vs. task medians) |
 | Item bank admin | Admins author/edit tasks with a validated rubric schema, retire tasks, see per-item statistics from real learners (attempts, mean, pass rate, observed medians) and recalibrate benchmarks from data. Grant admin with `npm run db:admin -- you@example.com` or `ADMIN_EMAILS` |
 | Certificates | Ed25519-signed credentials per track (all tasks passed at 85+), 24-month expiry, public `/verify/<id>` page, machine verification API and published public key; tamper detection |
@@ -49,6 +53,7 @@ All optional — see `.env.example`.
 | `LOCAL_LLM_BASE_URL`, `LOCAL_LLM_MODEL` | *(unset → simulated 3B model)* | The "local" side of Local Lab, e.g. Ollama |
 | `CLOUD_USD_PER_MTOK` | `5` | Reference price used to cost the cloud side in Local Lab |
 | `ADMIN_EMAILS` | – | Comma-separated emails treated as admins |
+| `AGENT_POLICY` | `scripted` | `llm` lets the configured (non-simulated) model choose each agent step; tool allow-lists and budgets still apply |
 | `PROMPTIQ_SIGNING_KEY` | *(dev: auto-generated `.data/signing-key.pem`)* | Ed25519 PKCS#8 PEM private key for certificates — **required in production** |
 
 ### Free model options
@@ -116,6 +121,8 @@ All JSON. Authenticated routes use the session cookie set by login/sign-up.
 | `GET /api/credentials` · `POST /api/credentials` `{track}` | ✓ | Track progress and certificates / issue one |
 | `GET /api/credentials/:id/verify` · `GET /api/credentials/public-key` | – | Public verification |
 | `GET/POST /api/admin/tasks` · `PATCH /api/admin/tasks/:id` · `POST /api/admin/tasks/:id/recalibrate` | admin | Item bank authoring, retirement and recalibration |
+| `POST /api/agents/tutor` · `POST /api/agents/optimiser` `{attemptId}` · `POST /api/agents/planner` | ✓ | Next hint / optimised prompt for your own attempt / your next three tasks |
+| `GET /api/admin/agents` · `POST /api/admin/agents` `{agent, attemptId \| draft}` · `POST /api/admin/agents/:id` `{approve}` | admin | Agent run log / start the Integrity Reviewer or Task Author / approve or reject a proposal |
 | `GET /api/health` | – | DB + provider status |
 
 ## Security
@@ -127,6 +134,8 @@ All JSON. Authenticated routes use the session cookie set by login/sign-up.
 - Headers: `nosniff`, `X-Frame-Options: DENY` / `frame-ancestors 'none'`, strict referrer policy, restrictive `Permissions-Policy`, HSTS in production.
 - Certificates: Ed25519-signed; production refuses to start signing without `PROMPTIQ_SIGNING_KEY`.
 - Item bank secrecy: rubrics and reference responses never leave the server.
+- Prompt privacy: secrets in a prompt are refused; personal data is masked before any external model sees it.
+- Agents: each agent can call only its allow-listed tools, within step and token budgets; every step is logged, and anything that changes scores or the item bank waits for an admin's approval.
 - Privacy: users can download all their data (`/api/me/export`) and delete their account.
 
 ## Project layout
@@ -137,7 +146,8 @@ components/             UI (TaskRunner, LabRunner, Certificates, Sidebar, …)
 lib/scoring/            Pure scoring engine: rubric, metrics, technique detection, feedback, progression
 lib/server/db/          Drizzle schema, client (PGlite | Postgres), migrations, seed data
 lib/server/services/    Accounts, attempts, catalog/leaderboards, Local Lab, certification
-lib/server/             DAL (auth), HTTP helpers, LLM providers, credential signing
+lib/server/agents/      Agent orchestrator and agents (tutor, optimiser, planner, integrity reviewer, task author)
+lib/server/             DAL (auth), HTTP helpers, LLM providers, privacy gateway, routing engine, credential signing
 proxy.ts                Optimistic redirect for signed-out visitors (real checks live in the DAL)
 tests/                  Vitest suites
 research/               The research study behind the feedback (separate repository)
