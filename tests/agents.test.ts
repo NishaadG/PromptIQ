@@ -3,11 +3,11 @@ import { count, eq } from "drizzle-orm";
 import { createTestDb, type DB } from "@/lib/server/db/client";
 import { seed } from "@/lib/server/db/seed";
 import { SEED_TASKS } from "@/lib/server/db/seed-data";
-import { agentRuns, attempts } from "@/lib/server/db/schema";
+import { agentRuns, attempts, tasks } from "@/lib/server/db/schema";
 import { signUp } from "@/lib/server/services/accounts";
 import { claimAttempt, runAttempt } from "@/lib/server/services/attempts";
 import { simulatedProvider } from "@/lib/server/llm";
-import { AgentError, curriculumPlanner, decideRun, integrityReviewer, promptOptimiser, runAgent, tutor } from "@/lib/server/agents";
+import { AgentError, curriculumPlanner, decideRun, integrityReviewer, promptOptimiser, runAgent, taskAuthor, tutor } from "@/lib/server/agents";
 import type { AgentDef } from "@/lib/server/agents/core";
 
 let db: DB;
@@ -140,5 +140,48 @@ describe("Integrity Reviewer", () => {
     await decideRun(db, admin, integrityReviewer, run.id, false);
     const [a] = await db.select().from(attempts).where(eq(attempts.id, attempt.id));
     expect(a.integrity.review).toBeUndefined(); // rejected proposals change nothing
+  });
+});
+
+describe("Task Author", () => {
+  const draftOf = (t: (typeof SEED_TASKS)[number], id: string) => {
+    const { number: _n, difficultyRating: _d, ...rest } = t as typeof t & { number?: number; difficultyRating?: number };
+    return { ...rest, id };
+  };
+
+  it("passes every seed task as a draft: expert > average >= lazy with a clear gap", async () => {
+    const admin = await user("author@example.com");
+    for (const t of SEED_TASKS) {
+      const { run, output } = await runAgent(taskAuthor, { db, user: admin, input: { draft: draftOf(t, `${t.id}-copy`) } });
+      expect(output.issues, t.id).toEqual([]);
+      expect(output.passed).toBe(true);
+      expect(run.status).toBe("awaiting_approval");
+    }
+  });
+
+  it("rejects a draft whose rubric doesn't reward a better prompt, and won't publish it", async () => {
+    const admin = await user("author2@example.com");
+    const weak = { ...draftOf(SEED_TASKS[0], "weak-rubric"), rubric: [{ kind: "max_words", label: "Under 1000 words", max: 1000, weight: 1 }] };
+    const { run, output } = await runAgent(taskAuthor, { db, user: admin, input: { draft: weak } });
+    expect(output.passed).toBe(false);
+    expect(output.issues.join(" ")).toMatch(/points apart|out of order/);
+    await expect(decideRun(db, admin, taskAuthor, run.id, true)).rejects.toThrow(/failed its checks/);
+  });
+
+  it("reports schema problems without running any model", async () => {
+    const admin = await user("author3@example.com");
+    const { run, output } = await runAgent(taskAuthor, { db, user: admin, input: { draft: { id: "Bad Slug!" } } });
+    expect(output.passed).toBe(false);
+    expect(output.issues.some((i) => i.startsWith("id:"))).toBe(true);
+    expect(run.steps).toHaveLength(1);
+  });
+
+  it("publishes an approved draft into the item bank", async () => {
+    const admin = await user("author4@example.com");
+    const { run } = await runAgent(taskAuthor, { db, user: admin, input: { draft: draftOf(SEED_TASKS[6], "plan-math-approved") } });
+    expect(await db.select().from(tasks).where(eq(tasks.id, "plan-math-approved"))).toHaveLength(0);
+    await decideRun(db, admin, taskAuthor, run.id, true);
+    const [t] = await db.select().from(tasks).where(eq(tasks.id, "plan-math-approved"));
+    expect(t.title).toBe(SEED_TASKS[6].title);
   });
 });

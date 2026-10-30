@@ -12,20 +12,12 @@ import type { Task } from "../lib/server/db/schema";
 import { composeUserMessage, simulatedProvider, simulatedSmallProvider, type LlmProvider } from "../lib/server/llm";
 import { scoreAttempt, detectTechniques } from "../lib/scoring";
 import { CLOUD_USD_PER_MTOK } from "../lib/server/services/lab";
+import { AVERAGE_PROMPTS, LAZY_PROMPT } from "../lib/scoring/reference-prompts";
 
 const tasks = SEED_TASKS.map((t) => ({ ...t, active: true, createdAt: new Date() })) as unknown as Task[];
 
-const AVERAGE: Record<string, string> = {
-  summarization: "Please summarize the following text and tell me the important parts of it.",
-  extraction: "Find the invoice totals in this email thread and tell me what is owed.",
-  rewriting: "Rewrite this text so that it sounds better and more professional for the reader.",
-  explanation: "Explain what is going on in the following and why it is a problem.",
-  classification: "Classify each of the following support tickets into a suitable category.",
-  reasoning: "Work out which of these two options is cheaper and tell me the answer.",
-  code: "Review this code and tell me what is wrong with it and how to improve it.",
-  qa: "Answer the questions below using the policy document provided here.",
-};
-const LAZY = "Help with this.";
+const AVERAGE = AVERAGE_PROMPTS;
+const LAZY = LAZY_PROMPT;
 
 async function run(provider: LlmProvider, task: Task, prompt: string, usdPerMTok: number) {
   const c = await provider.complete({ user: composeUserMessage(prompt, task.context), maxTokens: task.tokenBudget, task, learnerPrompt: prompt });

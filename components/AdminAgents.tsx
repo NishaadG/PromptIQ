@@ -3,13 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Bot, Check, X } from "lucide-react";
-import type { IntegrityProposal } from "@/lib/server/agents";
+import type { AuthorProposal, IntegrityProposal } from "@/lib/server/agents";
 
 type Flagged = {
   id: string; handle: string; taskTitle: string; taskSuccess: number; flags: string[]; detail: string;
   review: "exclude" | "clear" | null;
 };
-type Proposal = { id: string; createdAt: string; output: IntegrityProposal };
+type Proposal = { id: string; createdAt: string } & ({ agent: "integrity_reviewer"; output: IntegrityProposal } | { agent: "task_author"; output: AuthorProposal });
 type RunRow = { id: string; agent: string; status: string; policy: string; steps: number; tokensUsed: number; createdAt: string; error: string | null };
 
 /** Integrity signals, the agents' proposals awaiting approval, and the agent run log. */
@@ -32,7 +32,7 @@ export function AdminAgents({ flagged, proposals, runs }: { flagged: Flagged[]; 
       setBusy(null);
     }
   }
-  const pendingFor = new Set(proposals.map((p) => p.output.attemptId));
+  const pendingFor = new Set(proposals.flatMap((p) => (p.agent === "integrity_reviewer" ? [p.output.attemptId] : [])));
 
   return (
     <section className="px-5 pb-12 md:px-10">
@@ -56,7 +56,7 @@ export function AdminAgents({ flagged, proposals, runs }: { flagged: Flagged[]; 
             ) : pendingFor.has(f.id) ? (
               <span className="font-mono text-[0.7rem] text-mute">proposal pending</span>
             ) : (
-              <button onClick={() => call(f.id, "/api/admin/agents", { attemptId: f.id })} disabled={!!busy} className="flex items-center gap-1 text-[0.78rem] underline underline-offset-4 hover:text-rust disabled:opacity-40">
+              <button onClick={() => call(f.id, "/api/admin/agents", { agent: "integrity_reviewer", attemptId: f.id })} disabled={!!busy} className="flex items-center gap-1 text-[0.78rem] underline underline-offset-4 hover:text-rust disabled:opacity-40">
                 <Bot size={13} strokeWidth={1.5} /> {busy === f.id ? "Reviewing…" : "Review with agent"}
               </button>
             )}
@@ -67,22 +67,46 @@ export function AdminAgents({ flagged, proposals, runs }: { flagged: Flagged[]; 
       <p className="eyebrow mt-12">Awaiting approval</p>
       <ul className="mt-4 border-t border-ink">
         {proposals.length === 0 && <li className="border-b border-line py-3 text-[0.9rem] text-ink-2">No proposals waiting.</li>}
-        {proposals.map(({ id, output: p }) => (
-          <li key={id} className="border-b border-line py-4">
-            <div className="flex flex-wrap items-baseline justify-between gap-3">
-              <span className="text-[0.92rem]">
-                Integrity Reviewer proposes to <span className={`font-medium ${p.recommendation === "exclude" ? "text-rust" : "text-olive"}`}>{p.recommendation}</span>
-                {" "}@{p.handle}&rsquo;s attempt on {p.taskTitle} <span className="font-mono text-[0.7rem] text-mute">· {p.confidence} confidence</span>
-              </span>
-              <span className="flex gap-3">
-                <button onClick={() => call(id, `/api/admin/agents/${id}`, { approve: true })} disabled={!!busy} className="flex items-center gap-1 text-[0.8rem] text-olive underline underline-offset-4 disabled:opacity-40"><Check size={13} /> Approve</button>
-                <button onClick={() => call(id, `/api/admin/agents/${id}`, { approve: false })} disabled={!!busy} className="flex items-center gap-1 text-[0.8rem] text-rust underline underline-offset-4 disabled:opacity-40"><X size={13} /> Reject</button>
-              </span>
-            </div>
-            <p className="mt-2 text-[0.88rem] text-ink-2">{p.summary}</p>
-            <ul className="mt-2 space-y-0.5 font-mono text-[0.72rem] text-mute">{p.evidence.map((e) => <li key={e}>· {e}</li>)}</ul>
-          </li>
-        ))}
+        {proposals.map((pr) => {
+          const { id } = pr;
+          const canApprove = pr.agent === "integrity_reviewer" || pr.output.passed;
+          return (
+            <li key={id} className="border-b border-line py-4">
+              <div className="flex flex-wrap items-baseline justify-between gap-3">
+                {pr.agent === "integrity_reviewer" ? (
+                  <span className="text-[0.92rem]">
+                    Integrity Reviewer proposes to <span className={`font-medium ${pr.output.recommendation === "exclude" ? "text-rust" : "text-olive"}`}>{pr.output.recommendation}</span>
+                    {" "}@{pr.output.handle}&rsquo;s attempt on {pr.output.taskTitle} <span className="font-mono text-[0.7rem] text-mute">· {pr.output.confidence} confidence</span>
+                  </span>
+                ) : (
+                  <span className="text-[0.92rem]">
+                    Task Author {pr.output.passed ? "proposes to publish" : "rejects its own draft of"} <span className="font-medium">{pr.output.title}</span>
+                    <span className="font-mono text-[0.7rem] text-mute"> · {pr.output.taskId}{pr.output.existing ? " · updates an existing task" : ""}</span>
+                  </span>
+                )}
+                <span className="flex gap-3">
+                  <button onClick={() => call(id, `/api/admin/agents/${id}`, { approve: true })} disabled={!!busy || !canApprove} title={canApprove ? undefined : "Failed its checks"} className="flex items-center gap-1 text-[0.8rem] text-olive underline underline-offset-4 disabled:no-underline disabled:opacity-40"><Check size={13} /> Approve</button>
+                  <button onClick={() => call(id, `/api/admin/agents/${id}`, { approve: false })} disabled={!!busy} className="flex items-center gap-1 text-[0.8rem] text-rust underline underline-offset-4 disabled:opacity-40"><X size={13} /> {canApprove ? "Reject" : "Dismiss"}</button>
+                </span>
+              </div>
+              {pr.agent === "integrity_reviewer" ? (
+                <>
+                  <p className="mt-2 text-[0.88rem] text-ink-2">{pr.output.summary}</p>
+                  <ul className="mt-2 space-y-0.5 font-mono text-[0.72rem] text-mute">{pr.output.evidence.map((e) => <li key={e}>· {e}</li>)}</ul>
+                </>
+              ) : (
+                <>
+                  {pr.output.levels.length > 0 && (
+                    <p className="mt-2 font-mono text-[0.75rem] text-ink-2">
+                      reference {pr.output.reference} · {pr.output.levels.map((l) => `${l.level} ${l.taskSuccess}`).join(" · ")}
+                    </p>
+                  )}
+                  {pr.output.issues.length > 0 && <ul className="mt-2 space-y-0.5 text-[0.84rem] text-rust">{pr.output.issues.map((e) => <li key={e}>· {e}</li>)}</ul>}
+                </>
+              )}
+            </li>
+          );
+        })}
       </ul>
 
       <p className="eyebrow mt-12">Agent runs</p>

@@ -5,7 +5,7 @@ import { getDb } from "@/lib/server/db";
 import { requireUser } from "@/lib/server/dal";
 import { flaggedAttempts, isAdmin, itemStats, MIN_ATTEMPTS_TO_RECALIBRATE } from "@/lib/server/services/admin";
 import { AdminAgents } from "@/components/AdminAgents";
-import { listRuns, type IntegrityProposal } from "@/lib/server/agents";
+import { listRuns, type AuthorProposal, type IntegrityProposal } from "@/lib/server/agents";
 
 export default async function AdminPage() {
   const user = await requireUser();
@@ -36,7 +36,9 @@ export default async function AdminPage() {
           review: f.integrity.review?.decision ?? null,
           detail: `${Number(f.promptChars)} chars${f.integrity.elapsedMs !== undefined ? ` in ${(f.integrity.elapsedMs / 1000).toFixed(1)}s` : ""}${f.integrity.pastedChars ? ` · ${f.integrity.pastedChars} pasted` : ""} · ${f.createdAt.toLocaleDateString("en-GB")}`,
         }))}
-        proposals={pending.map((r) => ({ id: r.id, createdAt: r.createdAt.toISOString(), output: r.output as IntegrityProposal }))}
+        proposals={pending.map((r) => ({ id: r.id, createdAt: r.createdAt.toISOString(), ...(r.agent === "task_author"
+          ? { agent: "task_author" as const, output: r.output as AuthorProposal }
+          : { agent: "integrity_reviewer" as const, output: r.output as IntegrityProposal }) }))}
         runs={runs.map((r) => ({
           id: r.id, agent: r.agent, status: r.status, policy: r.policy, steps: r.steps.length, tokensUsed: r.tokensUsed,
           createdAt: r.createdAt.toISOString(), error: r.error,

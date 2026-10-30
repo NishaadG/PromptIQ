@@ -46,6 +46,12 @@ export function AdminItemBank({ items, minAttempts }: { items: Item[]; minAttemp
     if (await call("/api/admin/tasks", "POST", parsed)) setMsg("Saved.");
   }
 
+  async function check() {
+    let parsed: unknown;
+    try { parsed = JSON.parse(json); } catch { return setMsg("The task definition is not valid JSON"); }
+    if (await call("/api/admin/agents", "POST", { agent: "task_author", draft: parsed })) setMsg("The Task Author has checked the draft. Its proposal is under Awaiting approval below.");
+  }
+
   return (
     <section className="px-5 py-8 md:px-10">
       {msg && <p className="mb-6 border border-line-2 bg-card px-4 py-3 text-[0.88rem]">{msg}</p>}
@@ -92,7 +98,11 @@ export function AdminItemBank({ items, minAttempts }: { items: Item[]; minAttemp
         </p>
         <textarea value={json} onChange={(e) => setJson(e.target.value)} rows={22} spellCheck={false}
           className="mt-4 block w-full border border-line bg-card px-5 py-4 font-mono text-[0.78rem] leading-relaxed outline-none focus:border-ink" />
-        <button onClick={save} className="btn btn-primary mt-4">Save task</button>
+        <div className="mt-4 flex flex-wrap gap-3">
+          <button onClick={check} className="btn btn-primary">Check with Task Author</button>
+          <button onClick={save} className="btn">Save without checks</button>
+        </div>
+        <p className="mt-2 text-[0.8rem] text-mute">The Task Author runs expert, average and lazy reference prompts and proposes the task only if they score in that order.</p>
       </div>
     </section>
   );
