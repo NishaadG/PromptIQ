@@ -18,8 +18,8 @@ export const POST = handler(async (req: NextRequest, ctx: RouteContext<"/api/tas
   const { id } = await ctx.params;
   const { prompt, elapsedMs, pastedChars } = await parseBody(req, body);
   try {
-    const { attempt, percentile } = await runAttempt(await getDb(), user, id, prompt, undefined, { elapsedMs, pastedChars });
-    return json({ attempt: toClientAttempt(attempt), percentile }, 201);
+    const { attempt, task, percentile } = await runAttempt(await getDb(), user, id, prompt, undefined, { elapsedMs, pastedChars });
+    return json({ attempt: toClientAttempt(attempt, task.medianTokens), percentile }, 201);
   } catch (e) {
     if (e instanceof AttemptError) throw new HttpError(e.status, e.message);
     throw e;

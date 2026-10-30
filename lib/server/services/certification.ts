@@ -24,13 +24,16 @@ function levelFor(avg: number): "Foundational" | "Practitioner" | "Expert" {
 
 /**
  * Per track: how many tasks are passed (best claimed score ≥ PASS) and whether it is certifiable.
- * Attempts with a disqualifying integrity flag (see scoring/integrity.ts) are not certification evidence.
+ * Attempts with a disqualifying integrity flag (see scoring/integrity.ts) are not certification evidence,
+ * unless an admin cleared the flag; an admin can also exclude an attempt (Integrity Reviewer proposals).
  */
 export async function trackProgress(db: DB, userId: string) {
+  const review = sql`coalesce(${attempts.integrity}->'review'->>'decision', '')`;
+  const disqualified = sql`(${attempts.integrity}->'flags' @> '["implausible_typing_speed"]'::jsonb and ${review} <> 'clear') or ${review} = 'exclude'`;
   const rows = await db
     .select({
       track: tasks.category, taskId: tasks.id,
-      best: sql<number | null>`max(${attempts.taskSuccess}) filter (where ${attempts.claimed} and not (${attempts.integrity}->'flags' @> '["implausible_typing_speed"]'::jsonb))`,
+      best: sql<number | null>`max(${attempts.taskSuccess}) filter (where ${attempts.claimed} and not (${disqualified}))`,
     })
     .from(tasks)
     .leftJoin(attempts, and(eq(attempts.taskId, tasks.id), eq(attempts.userId, userId)))

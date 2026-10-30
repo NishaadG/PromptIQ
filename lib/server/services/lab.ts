@@ -9,12 +9,15 @@ import { labRuns, tasks, type LabSide, type Task, type User } from "../db/schema
 import { composeUserMessage, getLocalProvider, getProvider, type LlmProvider } from "../llm";
 import { scoreAttempt } from "../../scoring";
 import { AttemptError, MAX_PROMPT_CHARS } from "./attempts";
+import { gatePrompt, hasPersonalData, isExternalProvider, scanSensitive } from "../privacy";
+import { route } from "../router";
 
 /** Reference price for the cloud side, USD per million tokens (blended). Local inference is $0 marginal. */
 export const CLOUD_USD_PER_MTOK = Number(process.env.CLOUD_USD_PER_MTOK ?? 5);
 
-async function runSide(provider: LlmProvider, task: Task, prompt: string, label: string, pricePerMTok: number): Promise<LabSide> {
-  const c = await provider.complete({ user: composeUserMessage(prompt, task.context), maxTokens: Math.max(256, task.tokenBudget), task, learnerPrompt: prompt });
+/** `sent` is the prompt as this model receives it (masked for external models); scoring uses what the learner wrote. */
+async function runSide(provider: LlmProvider, task: Task, prompt: string, sent: string, label: string, pricePerMTok: number): Promise<LabSide> {
+  const c = await provider.complete({ user: composeUserMessage(sent, task.context), maxTokens: Math.max(256, task.tokenBudget), task, learnerPrompt: sent });
   const s = scoreAttempt({ task, prompt, response: c.text, promptTokens: c.inputTokens, outputTokens: c.outputTokens });
   return {
     provider: c.provider, model: c.model, label, response: c.text, taskSuccess: s.taskSuccess,
@@ -29,12 +32,28 @@ export async function runLab(db: DB, user: User, taskId: string, prompt: string,
   if (!task) throw new AttemptError(404, "Task not found");
   const cloudP = providers?.cloud ?? getProvider();
   const localP = providers?.local ?? getLocalProvider();
+  const cloudGate = gatePrompt(p, { external: isExternalProvider(cloudP.name) });
+  const localGate = gatePrompt(p, { external: isExternalProvider(localP.name) });
+  if (!cloudGate.ok) throw new AttemptError(400, cloudGate.reason);
+  if (!localGate.ok) throw new AttemptError(400, localGate.reason);
   const [cloud, local] = await Promise.all([
-    runSide(cloudP, task, p, cloudP.name.startsWith("simulated") ? "Simulated cloud model" : "Cloud model", CLOUD_USD_PER_MTOK),
-    runSide(localP, task, p, localP.name.startsWith("simulated") ? "Simulated 3B local model" : "Your local model", 0),
+    runSide(cloudP, task, p, cloudGate.text, cloudP.name.startsWith("simulated") ? "Simulated cloud model" : "Cloud model", CLOUD_USD_PER_MTOK),
+    runSide(localP, task, p, localGate.text, localP.name.startsWith("simulated") ? "Simulated 3B local model" : "Your local model", 0),
   ]);
   const [row] = await db.insert(labRuns).values({ id: randomUUID(), userId: user.id, taskId, prompt: p, cloud, local }).returning();
-  return { run: row, verdict: verdict(cloud, local) };
+
+  // Router (paper Eq. 3). The privacy term looks at everything the model would see: prompt and source text.
+  const personalData = hasPersonalData(cloudGate.findings) || hasPersonalData(scanSensitive(task.context));
+  const routing = route(
+    [
+      { id: "local", taskSuccess: local.taskSuccess, costUsd: local.costUsd, latencyMs: local.latencyMs, external: isExternalProvider(localP.name) },
+      // The simulated cloud model stands in for an external API, so it carries the privacy penalty too.
+      { id: "cloud", taskSuccess: cloud.taskSuccess, costUsd: cloud.costUsd, latencyMs: cloud.latencyMs, external: true },
+    ],
+    { personalData, budgetCostUsd: (task.tokenBudget * CLOUD_USD_PER_MTOK) / 1e6 },
+  );
+  const privacy = { personalData, maskedForCloud: cloudGate.redacted, findings: cloudGate.findings };
+  return { run: row, verdict: verdict(cloud, local), routing, privacy };
 }
 
 export function verdict(cloud: LabSide, local: LabSide) {

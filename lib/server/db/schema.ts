@@ -79,7 +79,9 @@ export const tasks = pgTable("tasks", {
 
 export type DetectedTechnique = { id: string; name: string; evidence: string };
 export type IntegrityFlag = "implausible_typing_speed" | "mostly_pasted" | "sudden_jump";
-export type IntegrityInfo = { flags: IntegrityFlag[]; elapsedMs?: number; pastedChars?: number };
+/** A human decision on flagged attempt, prepared by the Integrity Reviewer agent and approved by an admin. */
+export type IntegrityReview = { decision: "exclude" | "clear"; runId: string; by: string; at: string };
+export type IntegrityInfo = { flags: IntegrityFlag[]; elapsedMs?: number; pastedChars?: number; review?: IntegrityReview };
 export type FeedbackItem = { kind: "cost" | "win" | "tip" | "warn"; text: string; source?: string };
 
 export const attempts = pgTable(
@@ -153,6 +155,36 @@ export const labRuns = pgTable(
   },
   (t) => [index("lab_runs_user_idx").on(t.userId, t.createdAt)],
 );
+
+/* ------------------------------------------------------------------ agentic AI layer */
+
+export const AGENT_NAMES = ["tutor", "curriculum_planner", "prompt_optimiser", "task_author", "model_ops", "integrity_reviewer"] as const;
+export type AgentName = (typeof AGENT_NAMES)[number];
+export type AgentStep = { tool: string; input: unknown; output?: unknown; error?: string; thought?: string; ms: number };
+
+// One row per agent run: the step log, token spend and — for agents that change platform state — the approval decision.
+export const agentRuns = pgTable(
+  "agent_runs",
+  {
+    id: text("id").primaryKey(),
+    agent: text("agent", { enum: AGENT_NAMES }).notNull(),
+    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }), // who started the run
+    subjectId: text("subject_id"), // the attempt, task or learner the run is about
+    status: text("status", { enum: ["running", "completed", "failed", "awaiting_approval", "approved", "rejected"] }).notNull(),
+    policy: text("policy", { enum: ["scripted", "llm"] }).notNull(),
+    input: jsonb("input").$type<unknown>().notNull(),
+    output: jsonb("output").$type<unknown>(),
+    steps: jsonb("steps").$type<AgentStep[]>().notNull().default([]),
+    tokensUsed: integer("tokens_used").notNull().default(0),
+    error: text("error"),
+    decidedBy: text("decided_by").references(() => users.id, { onDelete: "set null" }),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    createdAt: createdAt(),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+  },
+  (t) => [index("agent_runs_subject_idx").on(t.agent, t.subjectId), index("agent_runs_status_idx").on(t.status, t.createdAt)],
+);
+export type AgentRun = typeof agentRuns.$inferSelect;
 
 export type User = typeof users.$inferSelect;
 export type Task = typeof tasks.$inferSelect;

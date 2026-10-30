@@ -4,6 +4,7 @@ import { getDb } from "@/lib/server/db";
 import { requireUser } from "@/lib/server/dal";
 import { getDashboard } from "@/lib/server/services/present";
 import { listTasksForUser } from "@/lib/server/services/catalog";
+import { PlanPanel } from "@/components/PlanPanel";
 
 const DAY_LETTERS = ["S", "M", "T", "W", "T", "F", "S"];
 
@@ -123,6 +124,8 @@ export default async function Dashboard() {
               </div>
             </div>
           )}
+
+          <PlanPanel />
 
           <div className="mt-12">
             <div className="flex items-baseline justify-between border-b border-line pb-3">

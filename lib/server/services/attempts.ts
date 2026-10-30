@@ -6,6 +6,7 @@ import { composeUserMessage, getProvider, type LlmProvider } from "../llm";
 import { judgeCriteria } from "../judge";
 import { computeReward, nextStreak, scoreAttempt, updateRatings, xpForAttempt } from "../../scoring";
 import { integritySignals } from "../../scoring/integrity";
+import { describeKind, gatePrompt, hasPersonalData, isExternalProvider } from "../privacy";
 
 /** Client-reported behaviour for integrity signals (optional; never trusted for scoring). */
 export type AttemptBehaviour = { elapsedMs?: number; pastedChars?: number };
@@ -37,10 +38,23 @@ export async function runAttempt(
     .where(and(eq(attempts.userId, user.id), eq(attempts.taskId, task.id), sql`${attempts.createdAt} > ${since}`));
   if (today >= MAX_ATTEMPTS_PER_TASK_PER_DAY) throw new AttemptError(429, "Daily attempt limit reached for this task — try another task");
 
-  const message = composeUserMessage(trimmed, task.context);
-  const completion = await provider.complete({ user: message, maxTokens: Math.max(256, task.tokenBudget), task, learnerPrompt: trimmed });
+  // Privacy gateway: secrets are refused; personal data is masked before it reaches an external model.
+  const gate = gatePrompt(trimmed, { external: isExternalProvider(provider.name) });
+  if (!gate.ok) throw new AttemptError(400, gate.reason);
+
+  const message = composeUserMessage(gate.text, task.context);
+  const completion = await provider.complete({ user: message, maxTokens: Math.max(256, task.tokenBudget), task, learnerPrompt: gate.text });
   const judged = await judgeCriteria(provider, task.rubric, { brief: task.brief, response: completion.text });
   const s = scoreAttempt({ task, prompt: trimmed, response: completion.text, promptTokens: completion.inputTokens, outputTokens: completion.outputTokens, judged });
+  if (hasPersonalData(gate.findings)) {
+    const kinds = [...new Set(gate.findings.filter((f) => !f.secret).map((f) => describeKind(f.kind)))].join(", ");
+    s.feedback = [{
+      kind: "warn" as const,
+      text: gate.redacted
+        ? `Your prompt contained personal data (${kinds}). It was masked before it reached the cloud model, so the model never saw it.`
+        : `Your prompt contains personal data (${kinds}). Leave it out of prompts unless the task needs it, and never send it to a cloud model.`,
+    }, ...s.feedback].slice(0, 5);
+  }
   const { reward, bonus } = computeReward(task.reward, s.taskSuccess, s.efficiency);
   const integrity = integritySignals({
     promptChars: trimmed.length, ...behaviour, taskSuccess: s.taskSuccess,

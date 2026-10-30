@@ -2,19 +2,21 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Cloud, HardDrive, Info, Play } from "lucide-react";
+import { Cloud, HardDrive, Info, Play, Route, ShieldAlert } from "lucide-react";
 import type { LabSide } from "@/lib/server/db/schema";
 
 type LabTask = { id: string; title: string; category: string; samplePrompt: string };
 type History = { category: string; runs: number; cloud: number; local: number }[];
 type Verdict = { kind: "matched" | "close" | "gap"; gap: number; text: string };
+type Routing = { pick: "local" | "cloud"; reasons: string[]; scores: { id: "local" | "cloud"; score: number; q: number; c: number; l: number; p: number }[] };
+type Privacy = { personalData: boolean; maskedForCloud: boolean };
 
 export function LabRunner({ tasks, history }: { tasks: LabTask[]; history: History }) {
   const router = useRouter();
   const [taskId, setTaskId] = useState(tasks[0]?.id ?? "");
   const task = tasks.find((t) => t.id === taskId);
   const [prompt, setPrompt] = useState(task?.samplePrompt ?? "");
-  const [result, setResult] = useState<{ cloud: LabSide; local: LabSide; verdict: Verdict } | null>(null);
+  const [result, setResult] = useState<{ cloud: LabSide; local: LabSide; verdict: Verdict; routing: Routing; privacy: Privacy } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -25,7 +27,7 @@ export function LabRunner({ tasks, history }: { tasks: LabTask[]; history: Histo
       const res = await fetch("/api/local-lab/runs", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ taskId, prompt }) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Run failed");
-      setResult({ cloud: data.run.cloud, local: data.run.local, verdict: data.verdict });
+      setResult({ cloud: data.run.cloud, local: data.run.local, verdict: data.verdict, routing: data.routing, privacy: data.privacy });
       router.refresh();
     } catch (e) {
       setError((e as Error).message);
@@ -75,6 +77,7 @@ export function LabRunner({ tasks, history }: { tasks: LabTask[]; history: Histo
             <Info size={16} strokeWidth={1.5} className="mt-0.5 shrink-0" />
             <p className="text-[0.93rem] leading-relaxed text-ink">{result.verdict.text}</p>
           </div>
+          <RouterPanel routing={result.routing} privacy={result.privacy} />
         </>
       )}
 
@@ -108,6 +111,41 @@ export function LabRunner({ tasks, history }: { tasks: LabTask[]; history: Histo
         </div>
       </div>
     </section>
+  );
+}
+
+function RouterPanel({ routing, privacy }: { routing: Routing; privacy: Privacy }) {
+  const name = (id: "local" | "cloud") => (id === "local" ? "Local model" : "Cloud model");
+  return (
+    <div className="mt-6 border border-line bg-card">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-3">
+        <span className="flex items-center gap-2 eyebrow !text-ink"><Route size={14} strokeWidth={1.5} /> Routing engine</span>
+        <span className="font-mono text-[0.7rem] text-mute">R = 0.70·Q − 0.12·C − 0.06·L − 0.12·P</span>
+      </div>
+      <div className="grid gap-6 px-5 py-4 md:grid-cols-[1fr_auto]">
+        <div>
+          <p className="text-[0.95rem]">Recommends the <span className={`font-medium ${routing.pick === "local" ? "text-olive" : ""}`}>{name(routing.pick).toLowerCase()}</span> for this task.</p>
+          <ul className="mt-2 space-y-1 text-[0.86rem] text-ink-2">{routing.reasons.map((r) => <li key={r}>· {r}</li>)}</ul>
+          {privacy.personalData && (
+            <p className="mt-3 flex items-start gap-2 text-[0.84rem] text-rust">
+              <ShieldAlert size={14} strokeWidth={1.5} className="mt-0.5 shrink-0" />
+              Personal data found in the prompt or source text{privacy.maskedForCloud ? "; your prompt was masked before it reached the cloud model" : ""}.
+            </p>
+          )}
+        </div>
+        <table className="font-mono text-[0.72rem] tabular">
+          <thead className="text-mute"><tr><th className="pr-4 text-left font-normal">Model</th><th className="px-2 font-normal">Q</th><th className="px-2 font-normal">C</th><th className="px-2 font-normal">L</th><th className="px-2 font-normal">P</th><th className="pl-2 font-normal">R</th></tr></thead>
+          <tbody>
+            {routing.scores.map((s) => (
+              <tr key={s.id} className={s.id === routing.pick ? "text-ink" : "text-mute"}>
+                <td className="pr-4">{name(s.id)}</td><td className="px-2">{s.q.toFixed(2)}</td><td className="px-2">{s.c.toFixed(2)}</td>
+                <td className="px-2">{s.l.toFixed(2)}</td><td className="px-2">{s.p}</td><td className="pl-2 font-medium">{s.score.toFixed(3)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
 }
 

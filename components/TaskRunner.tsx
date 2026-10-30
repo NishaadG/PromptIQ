@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Check, CornerDownLeft, Lightbulb, RotateCcw, Sparkles, TrendingDown, TriangleAlert, X } from "lucide-react";
 import type { ClientTask } from "@/lib/server/services/catalog";
 import type { ClientAttempt } from "@/lib/server/services/present";
+import { PesBreakdown } from "./PesBreakdown";
+import { AgentCoach } from "./AgentCoach";
 
 type Phase = "idle" | "running" | "revealing" | "done";
 const estimateTokens = (s: string) => Math.ceil(s.trim().length / 4);
@@ -239,6 +241,7 @@ function ScoreCard({ a, task, percentile, balance }: { a: ClientAttempt; task: C
           <Metric label="Efficiency" value={`${a.efficiency}`} sub={`median spend ${task.medianTokens}`} bar={a.efficiency / 100} tone="olive" />
           <Metric label="Clarity" value={`${a.clarity}`} sub="reader-fit" bar={a.clarity / 100} />
         </div>
+        <div className="border-b border-line"><PesBreakdown pes={a.pes} /></div>
         <ul className="px-6 py-4">
           {a.criteria.map((c) => (
             <li key={c.label} className="flex items-start gap-2.5 py-1.5 text-[0.86rem]">
@@ -278,6 +281,8 @@ function ScoreCard({ a, task, percentile, balance }: { a: ClientAttempt; task: C
           })}
         </ul>
       </div>
+
+      <AgentCoach attemptId={a.id} />
 
       <div className="rise mt-10 flex flex-wrap items-center justify-between gap-4 bg-ink px-6 py-5 text-paper" style={{ animationDelay: "350ms" }}>
         <div>

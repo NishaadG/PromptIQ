@@ -7,6 +7,9 @@ import { requireUser } from "@/lib/server/dal";
 import { getAttempt } from "@/lib/server/services/attempts";
 import { eq } from "drizzle-orm";
 import { tasks } from "@/lib/server/db/schema";
+import { PesBreakdown } from "@/components/PesBreakdown";
+import { AgentCoach } from "@/components/AgentCoach";
+import { attemptPes } from "@/lib/server/services/present";
 
 const FEEDBACK_TONE = { cost: "text-rust", warn: "text-rust", win: "text-olive", tip: "text-ink-2" } as const;
 
@@ -17,7 +20,7 @@ export default async function AttemptReview(props: PageProps<"/dashboard/attempt
   const db = await getDb();
   const a = await getAttempt(db, user.id, id);
   if (!a) notFound();
-  const [task] = await db.select({ title: tasks.title, active: tasks.active }).from(tasks).where(eq(tasks.id, a.taskId)).limit(1); // retired tasks still reviewable
+  const [task] = await db.select({ title: tasks.title, active: tasks.active, medianTokens: tasks.medianTokens }).from(tasks).where(eq(tasks.id, a.taskId)).limit(1); // retired tasks still reviewable
   return (
     <div className="rise">
       <PageHeader eyebrow={`Attempt ${a.attemptNumber} · ${a.createdAt.toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })}`} title={task?.title ?? a.taskId}>
@@ -39,6 +42,7 @@ export default async function AttemptReview(props: PageProps<"/dashboard/attempt
               </div>
             ))}
           </div>
+          {task && <div className="border-b border-line"><PesBreakdown pes={attemptPes(a, task.medianTokens)} /></div>}
           <p className="eyebrow mt-10">Rubric</p>
           <ul className="mt-2">
             {a.criteria.map((c) => (
@@ -68,6 +72,7 @@ export default async function AttemptReview(props: PageProps<"/dashboard/attempt
               </li>
             ))}
           </ul>
+          <AgentCoach attemptId={a.id} />
           <p className="mt-6 font-mono text-[0.7rem] text-mute">
             Reward {a.reward}{a.bonus ? ` + ${a.bonus} bonus` : ""} · {a.claimed ? "claimed" : "unclaimed"}
           </p>
