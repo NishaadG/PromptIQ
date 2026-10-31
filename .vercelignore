@@ -3,3 +3,5 @@ research/
 node_modules/
 .next/
 .env*
+.data/
+report/

@@ -2,7 +2,7 @@
  * Team / organisation view (PromptIQ doc, Module 8): members of the same organisation and an
  * organisational AI-readiness summary. Organisation membership is the free-text `org` field.
  */
-import { and, eq, gt, sql } from "drizzle-orm";
+import { and, eq, gt, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { DB } from "../db/client";
 import { attempts, credentials, tasks, users, type User } from "../db/schema";
@@ -39,12 +39,12 @@ export async function teamOverview(db: DB, org: string) {
     })
     .from(attempts)
     .innerJoin(tasks, eq(tasks.id, attempts.taskId))
-    .where(sql`${attempts.userId} in ${ids}`)
+    .where(inArray(attempts.userId, ids))
     .groupBy(attempts.userId);
   const certs = await db
     .select({ userId: credentials.userId, n: sql<number>`count(*)` })
     .from(credentials)
-    .where(and(sql`${credentials.userId} in ${ids}`, eq(credentials.revoked, false), gt(credentials.expiresAt, new Date())))
+    .where(and(inArray(credentials.userId, ids), eq(credentials.revoked, false), gt(credentials.expiresAt, new Date())))
     .groupBy(credentials.userId);
   const s = new Map(perUser.map((r) => [r.userId, r]));
   const c = new Map(certs.map((r) => [r.userId, Number(r.n)]));

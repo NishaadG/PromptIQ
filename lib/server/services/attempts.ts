@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, count, desc, eq, sql } from "drizzle-orm";
+import { and, count, desc, eq, gt, sql } from "drizzle-orm";
 import type { DB } from "../db/client";
 import { attempts, tasks, users, type Task, type User } from "../db/schema";
 import { composeUserMessage, getProvider, type LlmProvider } from "../llm";
@@ -35,7 +35,7 @@ export async function runAttempt(
   const [{ n: today }] = await db
     .select({ n: count() })
     .from(attempts)
-    .where(and(eq(attempts.userId, user.id), eq(attempts.taskId, task.id), sql`${attempts.createdAt} > ${since}`));
+    .where(and(eq(attempts.userId, user.id), eq(attempts.taskId, task.id), gt(attempts.createdAt, since)));
   if (today >= MAX_ATTEMPTS_PER_TASK_PER_DAY) throw new AttemptError(429, "Daily attempt limit reached for this task — try another task");
 
   // Privacy gateway: secrets are refused; personal data is masked before it reaches an external model.
